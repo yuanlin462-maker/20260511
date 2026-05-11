@@ -20,7 +20,12 @@ function setup() {
   // 初始化 PoseNet 模型
   // 檢查 ml5 是否正確載入
   if (typeof ml5 !== 'undefined') {
-    poseNet = ml5.poseNet(capture, () => console.log('模型已載入'));
+    // 設定模型選項，如有需要可調整
+    poseNet = ml5.poseNet(capture, { flipHorizontal: false }, () => {
+      console.log('模型已載入');
+    });
+    
+    // 當偵測到人體關鍵點時，更新 poses 變數
     poseNet.on('pose', (results) => {
       poses = results;
     });
@@ -47,17 +52,17 @@ function draw() {
   if (poses.length > 0) {
     for (let i = 0; i < poses.length; i++) {
       let pose = poses[i].pose;
-      // 設定填色為黃色
+
+      // 設定填色為黃色，無外框
       fill(255, 255, 0);
       noStroke();
 
-      // 使用 map 函數確保偵測點座標能精確對應到畫面上顯示的大小 (w, h)
-      // 並加入信心值 (confidence) 檢查，避免圓圈閃爍或跳動
+      // 加入信心值 (confidence) 檢查，門檻設為 0.5
       let confThreshold = 0.5; 
       
-      // 將偵測到的座標轉換為畫布上的相對位置並繪製圓圈
-      // 由於在 push/pop 內已經處理了翻轉與置中，座標需減去 w/2 與 h/2
+      // 辨識左耳與右耳點位
       if (pose.leftEar && pose.leftEar.confidence > confThreshold) {
+        // 將攝影機原始座標映射到畫布繪製區域的範圍 (-w/2 到 w/2)
         let lx = map(pose.leftEar.x, 0, capture.width, -w / 2, w / 2);
         let ly = map(pose.leftEar.y, 0, capture.height, -h / 2, h / 2);
         ellipse(lx, ly, 20);
