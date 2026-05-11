@@ -1,6 +1,21 @@
 let capture;
 let poseNet;
 let poses = [];
+let handpose;
+let hands = [];
+let earringImgs = [];
+let currentEarringIndex = 0; // 預設顯示第一款耳環
+
+function preload() {
+  // 載入 pic 目錄下的 5 款耳環圖片
+  for (let i = 1; i <= 5; i++) {
+    let imgPath = 'pic/acc' + i + '_ring.png';
+    earringImgs.push(loadImage(imgPath, 
+      () => console.log(imgPath + ' 載入成功'),
+      () => console.error(imgPath + ' 載入失敗，請確認檔案是否存在於 pic 資料夾中')
+    ));
+  }
+}
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
@@ -11,7 +26,7 @@ function setup() {
 
   // 建立攝影機擷取，並加入錯誤處理
   capture = createCapture(VIDEO, (stream) => {
-    console.log('攝影機已啟動');
+    console.log('攝影機授權成功並啟動');
   });
   capture.size(captureW, captureH);
   // 隱藏預設產生的 HTML5 影片元件，我們要在 canvas 裡繪製
@@ -31,6 +46,12 @@ function setup() {
     poseNet.on('pose', (results) => {
       poses = results;
     });
+
+    // 初始化 Handpose 模型用於手指辨識
+    handpose = ml5.handpose(capture, () => console.log('手勢辨識模型已載入'));
+    handpose.on('predict', results => {
+      hands = results;
+    });
   } else {
     console.error('錯誤：找不到 ml5 程式庫，請確保 HTML 中已引入 ml5.js');
   }
@@ -42,6 +63,15 @@ function draw() {
   let w = width * 0.5;
   let h = height * 0.5;
 
+  // 偵測手勢並更新耳環索引 (確保 hands[0] 存在且有 landmarks)
+  if (hands.length > 0 && hands[0].landmarks) {
+    let fingerCount = countFingers(hands[0]);
+    // 如果偵測到 1~5 根手指，更新當前耳環索引
+    if (fingerCount >= 1 && fingerCount <= 5) {
+      currentEarringIndex = fingerCount - 1;
+    }
+  }
+
   push();
   // 將座標原點移至畫布中心
   translate(width / 2, height / 2);
@@ -50,29 +80,35 @@ function draw() {
   // 繪製影像，起點設在負的一半寬高處以確保中心對齊
   image(capture, -w / 2, -h / 2, w, h);
 
+  // 根據手勢選取要顯示的圖片
+  let activeEarring = earringImgs[currentEarringIndex];
+
   // 繪製耳垂位置的黃色圓圈 (在 push/pop 內，座標會隨 scale(-1, 1) 自動翻轉)
   if (poses.length > 0) {
     for (let i = 0; i < poses.length; i++) {
       let pose = poses[i].pose;
-
-      // 設定填色為黃色，無外框
-      fill(255, 255, 0);
-      noStroke();
-
       // 加入信心值 (confidence) 檢查，門檻設為 0.5
-      let confThreshold = 0.5; 
+      let confThreshold = 0.5;
+      
+      // 設定圖片繪製模式為中心
+      imageMode(CENTER);
       
       // 辨識左耳與右耳點位
       if (pose.leftEar && pose.leftEar.confidence > confThreshold) {
         // 將攝影機原始座標映射到畫布繪製區域的範圍 (-w/2 到 w/2)
         let lx = map(pose.leftEar.x, 0, capture.width, -w / 2, w / 2);
         let ly = map(pose.leftEar.y, 0, capture.height, -h / 2, h / 2);
-        ellipse(lx, ly, 20);
+        // 檢查圖片是否載入成功 (寬度 > 1 表示載入成功) 且確認 capture 已準備好
+        if (activeEarring && activeEarring.width > 1 && capture.width > 0) {
+          image(activeEarring, lx, ly, 40, 40);
+        }
       }
       if (pose.rightEar && pose.rightEar.confidence > confThreshold) {
         let rx = map(pose.rightEar.x, 0, capture.width, -w / 2, w / 2);
         let ry = map(pose.rightEar.y, 0, capture.height, -h / 2, h / 2);
-        ellipse(rx, ry, 20);
+        if (activeEarring && activeEarring.width > 1 && capture.width > 0) {
+          image(activeEarring, rx, ry, 40, 40);
+        }
       }
     }
   }
@@ -81,4 +117,22 @@ function draw() {
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
+}
+
+// 計算伸出的手指數量 (基於 MediaPipe Handpose 關鍵點)
+function countFingers(hand) {
+  let landmarks = hand.landmarks;
+  let count = 0;
+  
+  // 檢查食指、中指、無名指、小指 (指尖 Y 座標小於第二指節 Y 座標代表伸出)
+  if (landmarks[8][1] < landmarks[6][1]) count++;   // 食指
+  if (landmarks[12][1] < landmarks[10][1]) count++; // 中指
+  if (landmarks[16][1] < landmarks[14][1]) count++; // 無名指
+  if (landmarks[20][1] < landmarks[18][1]) count++; // 小指
+  
+  // 大拇指辨識：檢查大拇指尖(4)與大拇指根部(2)的水平偏移
+  let thumbIsOut = Math.abs(landmarks[4][0] - landmarks[2][0]) > Math.abs(landmarks[5][0] - landmarks[17][0]) * 0.4;
+  if (thumbIsOut) count++;
+
+  return count;
 }
