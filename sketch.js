@@ -7,12 +7,12 @@ let earringImgs = [];
 let currentEarringIndex = 0; // 預設顯示第一款耳環
 
 function preload() {
-  // 載入 pic 目錄下的 5 款耳環圖片
+  // 載入「耳環圖片」目錄下的 5 款耳環圖片
   for (let i = 1; i <= 5; i++) {
-    let imgPath = 'pic/acc' + i + '_ring.png';
+    let imgPath = '耳環圖片/acc' + i + '_ring.png';
     earringImgs.push(loadImage(imgPath, 
       () => console.log(imgPath + ' 載入成功'),
-      () => console.error(imgPath + ' 載入失敗，請確認檔案是否存在於 pic 資料夾中')
+      () => console.error(imgPath + ' 載入失敗，請確認資料夾名稱是否為「耳環圖片」並包含此檔案')
     ));
   }
 }
@@ -62,15 +62,26 @@ function draw() {
 
   let w = width * 0.5;
   let h = height * 0.5;
+  let detectedFingers = 0;
 
   // 偵測手勢並更新耳環索引 (確保 hands[0] 存在且有 landmarks)
   if (hands.length > 0 && hands[0].landmarks) {
-    let fingerCount = countFingers(hands[0]);
+    detectedFingers = countFingers(hands[0]);
     // 如果偵測到 1~5 根手指，更新當前耳環索引
-    if (fingerCount >= 1 && fingerCount <= 5) {
-      currentEarringIndex = fingerCount - 1;
+    if (detectedFingers >= 1 && detectedFingers <= 5) {
+      currentEarringIndex = detectedFingers - 1;
     }
   }
+
+  // 在左上角顯示除錯資訊
+  push();
+  fill(255, 0, 0);
+  noStroke();
+  textSize(20);
+  textAlign(LEFT, TOP);
+  text('偵測手指數量: ' + detectedFingers, 10, 10);
+  text('目前使用款式: acc' + (currentEarringIndex + 1), 10, 40);
+  pop();
 
   push();
   // 將座標原點移至畫布中心
@@ -81,7 +92,7 @@ function draw() {
   image(capture, -w / 2, -h / 2, w, h);
 
   // 根據手勢選取要顯示的圖片
-  let activeEarring = earringImgs[currentEarringIndex];
+  let activeEarring = (earringImgs.length > currentEarringIndex) ? earringImgs[currentEarringIndex] : null;
 
   // 繪製耳垂位置的黃色圓圈 (在 push/pop 內，座標會隨 scale(-1, 1) 自動翻轉)
   if (poses.length > 0) {
