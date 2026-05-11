@@ -20,10 +20,12 @@ function setup() {
   // 初始化 PoseNet 模型
   // 檢查 ml5 是否正確載入
   if (typeof ml5 !== 'undefined') {
-    // 設定模型選項，如有需要可調整
-    poseNet = ml5.poseNet(capture, { flipHorizontal: false }, () => {
-      console.log('模型已載入');
-    });
+    // 確保 capture 存在後再啟動模型
+    if (capture) {
+      poseNet = ml5.poseNet(capture, { flipHorizontal: false }, () => {
+        console.log('模型已載入');
+      });
+    }
     
     // 當偵測到人體關鍵點時，更新 poses 變數
     poseNet.on('pose', (results) => {
